@@ -1,0 +1,17 @@
+spring.application.name: spai
+
+spring:
+  ai:
+    openai:
+      api-key:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
+
+  datasource:
+    url:
+    username:
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
