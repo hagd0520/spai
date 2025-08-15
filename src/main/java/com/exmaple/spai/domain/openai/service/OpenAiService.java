@@ -1,12 +1,16 @@
 package com.exmaple.spai.domain.openai.service;
 
+import com.exmaple.spai.domain.openai.entity.Chat;
+import com.exmaple.spai.domain.openai.repository.ChatRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.audio.transcription.AudioTranscriptionResponse;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -40,6 +44,7 @@ public class OpenAiService {
     private final OpenAiAudioSpeechModel openAiAudioSpeechModel;
     private final OpenAiAudioTranscriptionModel openAiAudioTranscriptionModel;
     private final ChatMemoryRepository chatMemoryRepository;
+    private final ChatRepository chatRepository;
 
     // 1. chatModel : response
     public String generate(String text) {
@@ -66,8 +71,16 @@ public class OpenAiService {
     // 1. chatModel : response stream
     public Flux<String> generateStream(String text) {
 
+        ChatClient chatClient = ChatClient.create(openAiChatModel);
+
         // 유저&페이지 별 ChatMemory 를 관리하기 위한 key (우선은 명시적으로)
         String userId = "xxxjjhhh" + "_" + "1";
+
+        // 전체 대화 저장용
+        Chat userChat = new Chat();
+        userChat.setUserId(userId);
+        userChat.setType(MessageType.USER);
+        userChat.setContent(text);
 
         // 메시지
 //        SystemMessage systemMessage = new SystemMessage("");
@@ -92,18 +105,46 @@ public class OpenAiService {
         StringBuilder responseBuffer = new StringBuilder();
 
         // 요청 및 응답
-//        return openAiChatModel.stream(prompt)
-//                .mapNotNull(response -> response.getResult().getOutput().getText());
-        return openAiChatModel.stream(prompt)
-                .mapNotNull(response -> {
-                    String token = response.getResult().getOutput().getText();
+        return chatClient.prompt(prompt)
+                .stream()
+                .content()
+                .map(token -> {
                     responseBuffer.append(token);
                     return token;
                 })
                 .doOnComplete(() -> {
                     chatMemory.add(userId, new AssistantMessage(responseBuffer.toString()));
                     chatMemoryRepository.saveAll(userId, chatMemory.get(userId));
+
+                    // 전체 대화 저장용
+                    Chat assistantChat = new Chat();
+                    assistantChat.setUserId(userId);
+                    assistantChat.setType(MessageType.ASSISTANT);
+                    assistantChat.setContent(responseBuffer.toString());
+
+                    chatRepository.saveAll(List.of(userChat, assistantChat));
                 });
+
+//        return openAiChatModel.stream(prompt)
+//                .mapNotNull(response -> response.getResult().getOutput().getText());
+//        return openAiChatModel.stream(prompt)
+//                .mapNotNull(response -> {
+//                    String token = response.getResult().getOutput().getText();
+//                    responseBuffer.append(token);
+//                    return token;
+//                })
+//                .doOnComplete(() -> {
+//                    chatMemory.add(userId, new AssistantMessage(responseBuffer.toString()));
+//                    chatMemoryRepository.saveAll(userId, chatMemory.get(userId));
+//
+//                    // 전체 대화 저장용
+//                    Chat assistantChat = new Chat();
+//                    assistantChat.setUserId(userId);
+//                    assistantChat.setType(MessageType.ASSISTANT);
+//                    assistantChat.setContent(responseBuffer.toString());
+//
+//                    chatRepository.saveAll(List.of(userChat, assistantChat));
+//                });
     }
 
     // 2. 임베딩 api 호출 메소드
