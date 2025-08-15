@@ -1,5 +1,6 @@
 package com.exmaple.spai.api;
 
+import com.exmaple.spai.domain.openai.dto.CityResponseDTO;
 import com.exmaple.spai.domain.openai.entity.Chat;
 import com.exmaple.spai.domain.openai.service.ChatService;
 import com.exmaple.spai.domain.openai.service.OpenAiService;
@@ -25,7 +26,7 @@ public class ChatController {
 
     @ResponseBody
     @PostMapping("/chat")
-    public String chat(@RequestBody Map<String, String> body) {
+    public CityResponseDTO chat(@RequestBody Map<String, String> body) {
         return openAiService.generate(body.get("text"));
     }
 

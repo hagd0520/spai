@@ -1,5 +1,6 @@
 package com.exmaple.spai.domain.openai.service;
 
+import com.exmaple.spai.domain.openai.dto.CityResponseDTO;
 import com.exmaple.spai.domain.openai.entity.Chat;
 import com.exmaple.spai.domain.openai.repository.ChatRepository;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,9 @@ public class OpenAiService {
     private final ChatRepository chatRepository;
 
     // 1. chatModel : response
-    public String generate(String text) {
+    public CityResponseDTO generate(String text) {
+
+        ChatClient chatClient = ChatClient.create(openAiChatModel);
 
         // 메시지
         SystemMessage systemMessage = new SystemMessage("");
@@ -65,7 +68,9 @@ public class OpenAiService {
 
         // 요청 및 응답
         ChatResponse response  = openAiChatModel.call(prompt);
-        return response.getResult().getOutput().getText();
+        return chatClient.prompt(prompt)
+                .call()
+                .entity(CityResponseDTO.class);
     }
 
     // 1. chatModel : response stream
