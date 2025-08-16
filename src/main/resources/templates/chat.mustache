@@ -166,6 +166,7 @@
 
     inputText.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') sendBtn.click();
+        chatDiv.scrollTop = chatDiv.scrollHeight;
     });
 
     // 페이지 로드 시 대화 불러오기

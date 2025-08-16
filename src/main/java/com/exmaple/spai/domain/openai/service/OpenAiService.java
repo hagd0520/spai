@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.ai.audio.transcription.AudioTranscriptionPrompt;
 import org.springframework.ai.audio.transcription.AudioTranscriptionResponse;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
@@ -14,7 +15,6 @@ import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.embedding.Embedding;
 import org.springframework.ai.embedding.EmbeddingOptions;
@@ -27,6 +27,8 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.openai.api.OpenAiAudioApi;
 import org.springframework.ai.openai.audio.speech.SpeechPrompt;
 import org.springframework.ai.openai.audio.speech.SpeechResponse;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -46,6 +48,7 @@ public class OpenAiService {
     private final OpenAiAudioTranscriptionModel openAiAudioTranscriptionModel;
     private final ChatMemoryRepository chatMemoryRepository;
     private final ChatRepository chatRepository;
+    private final VectorStore vectorStore;
 
     // 1. chatModel : response
     public CityResponseDTO generate(String text) {
@@ -67,7 +70,7 @@ public class OpenAiService {
         Prompt prompt = new Prompt(List.of(systemMessage, userMessage, assistantMessage), options);
 
         // 요청 및 응답
-        ChatResponse response  = openAiChatModel.call(prompt);
+//        ChatResponse response  = openAiChatModel.call(prompt);
         return chatClient.prompt(prompt)
                 .call()
                 .entity(CityResponseDTO.class);
@@ -103,14 +106,22 @@ public class OpenAiService {
                 .temperature(0.7)
                 .build();
 
+        // RAG
+        QuestionAnswerAdvisor ragAdvisor = QuestionAnswerAdvisor.builder(vectorStore)
+                .searchRequest(SearchRequest.builder().similarityThreshold(0.8d).topK(6).build())
+                .build();
+
         // 프롬프트
 //        Prompt prompt = new Prompt(List.of(systemMessage, userMessage, assistantMessage), options);
         Prompt prompt = new Prompt(chatMemory.get(userId), options);
 
+        // 응답 메시지를 저장할 임시 버퍼
         StringBuilder responseBuffer = new StringBuilder();
 
         // 요청 및 응답
         return chatClient.prompt(prompt)
+                .tools(new ChatTools())
+                .advisors(ragAdvisor)
                 .stream()
                 .content()
                 .map(token -> {
